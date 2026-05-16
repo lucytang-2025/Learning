@@ -6010,7 +6010,7 @@ const renderBatchCheckinItem = (item) => {
             };
 
             // ==================== GitHub Gist 云端同步 ====================
-            const GIST_API = 'https://api.github.com/gists';
+            const GIST_API = 'https://cors-anywhere.herokuapp.com/https://api.github.com/gists';
             
             // 保存 Gist 设置
             const saveGistSettings = (token, gistId) => {
@@ -6027,7 +6027,7 @@ const renderBatchCheckinItem = (item) => {
             };
             
             // 上传数据到 Gist
-            const uploadToGist = async (token, gistId) => {
+                        const uploadToGist = async (token, gistId) => {
                 try {
                     const tasks = await dataStorage.getAllTasks();
                     const exportData = {
@@ -6043,7 +6043,8 @@ const renderBatchCheckinItem = (item) => {
                             method: 'PATCH',
                             headers: {
                                 'Authorization': `token ${token}`,
-                                'Content-Type': 'application/json'
+                                'Content-Type': 'application/json',
+                                'Origin': 'https://github.com'
                             },
                             body: JSON.stringify({
                                 files: {
@@ -6065,7 +6066,8 @@ const renderBatchCheckinItem = (item) => {
                             method: 'POST',
                             headers: {
                                 'Authorization': `token ${token}`,
-                                'Content-Type': 'application/json'
+                                'Content-Type': 'application/json',
+                                'Origin': 'https://github.com'
                             },
                             body: JSON.stringify({
                                 description: '复习打卡计划备份',
@@ -6094,13 +6096,14 @@ const renderBatchCheckinItem = (item) => {
             };
             
             // 从 Gist 下载数据
-            const downloadFromGist = async (token, gistId) => {
+                        const downloadFromGist = async (token, gistId) => {
                 try {
                     const response = await fetch(`${GIST_API}/${gistId}`, {
                         method: 'GET',
                         headers: {
                             'Authorization': `token ${token}`,
-                            'Accept': 'application/vnd.github.v3+json'
+                            'Accept': 'application/vnd.github.v3+json',
+                            'Origin': 'https://github.com'
                         }
                     });
                     
