@@ -1002,7 +1002,7 @@
                         <button class="btn btn-bulk-pause" id="bulk-pause-btn">暂停任务</button>
                         <button class="btn btn-bulk-resume" id="bulk-resume-btn">取消暂停</button>
                         <button class="btn" id="clear-data-btn">清除所有任务</button>
-<button class="btn" id="cloud-sync-btn" style="background: #27ae60; color: white;">☁️ 云端备份</button>
+<button class="btn" id="gist-sync-btn" style="background: #24292e; color: white;">🐙 GitHub Gist 同步</button>
                     </div>
                 </div>
                 
@@ -1343,7 +1343,7 @@
         </div>
     </div>
 
-    <!-- 内存监控警告模态框 -->
+        <!-- 内存监控警告模态框 -->
     <div id="memory-warning-modal" class="modal hidden">
         <div class="modal-content" style="max-width: 400px;">
             <div class="modal-header">
@@ -1360,6 +1360,39 @@
                         <button class="btn btn-cleanup" id="cleanup-data-btn" style="background: #ff6b6b; color: white;">立即清理</button>
                         <button class="btn" id="later-btn">稍后处理</button>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- GitHub Gist 同步模态框 -->
+    <div id="gist-sync-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3>🐙 GitHub Gist 云端同步</h3>
+                <button class="close-btn" id="close-gist-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>GitHub Token</label>
+                    <input type="password" id="gist-token" placeholder="输入 GitHub Personal Access Token">
+                    <small>在 GitHub Settings → Developer settings → Personal access tokens 中生成</small>
+                </div>
+                <div class="form-group">
+                    <label>Gist ID（可选，留空自动创建）</label>
+                    <input type="text" id="gist-id" placeholder="留空自动创建新 Gist">
+                    <small>第一次上传后会自动生成ID，后续同步会自动记住</small>
+                </div>
+                <div class="info-box" style="padding: 12px; background: #e8f4fd; border-radius: 4px; margin: 15px 0;">
+                    <strong>📌 使用说明：</strong>
+                    <p style="margin: 5px 0 0; font-size: 13px;">1. 第一台设备：输入Token → 点击"上传到Gist"</p>
+                    <p style="margin: 5px 0 0; font-size: 13px;">2. 第二台设备：输入相同Token → 点击"从Gist下载"</p>
+                    <p style="margin: 5px 0 0; font-size: 13px;">3. Token只保存在您的浏览器中，不会泄露</p>
+                </div>
+                <div class="task-actions" style="justify-content: flex-end;">
+                    <button class="btn" id="cancel-gist-btn">取消</button>
+                    <button class="btn btn-primary" id="upload-gist-btn" style="background: #28a745;">上传到 Gist</button>
+                    <button class="btn btn-success" id="download-gist-btn" style="background: #1b6ec2;">从 Gist 下载</button>
                 </div>
             </div>
         </div>
@@ -1457,7 +1490,7 @@
             class DataStorage {
                 constructor() {
                     this.dbName = 'CheckinAppDB';
-                    this.version = 17; // 升级版本号
+                    this.version = 16; // 升级版本号
                     this.db = null;
                 }
 
@@ -2222,7 +2255,7 @@ const scrollToTask = (taskId) => {
                 setupMemoryMonitoring();
                 setupSubtaskEventListeners();
                 setupAutoCleanup();
-                setupCloudSync();
+                setupGistSync();
                 
                 restoreRecordingUrls();
                 renderTodayTasks();
@@ -5954,27 +5987,26 @@ const renderBatchCheckinItem = (item) => {
                 if (isDisabled) { alert('今日已经打卡成功！'); return; }
                 startCheckin(taskId);
             };
-                        // ==================== 坚果云云端同步 ====================
-            // 坚果云配置
-            const NUTSCLOUD_SERVER = 'https://dav.jianguoyun.com/dav/';
-            const BACKUP_FILE = 'checkin_backup.json';
+
+            // ==================== GitHub Gist 云端同步 ====================
+            const GIST_API = 'https://api.github.com/gists';
             
-            // 保存坚果云账号密码
-            const saveNutCloudAccount = (username, password) => {
-                if (username) localStorage.setItem('nutcloud_username', username);
-                if (password) localStorage.setItem('nutcloud_password', password);
+            // 保存 Gist 设置
+            const saveGistSettings = (token, gistId) => {
+                if (token) localStorage.setItem('gist_token', token);
+                if (gistId) localStorage.setItem('gist_id', gistId);
             };
             
-            // 读取坚果云账号密码
-            const getNutCloudAccount = () => {
+            // 读取 Gist 设置
+            const getGistSettings = () => {
                 return {
-                    username: localStorage.getItem('nutcloud_username') || '',
-                    password: localStorage.getItem('nutcloud_password') || ''
+                    token: localStorage.getItem('gist_token') || '',
+                    gistId: localStorage.getItem('gist_id') || ''
                 };
             };
             
-            // 上传数据到坚果云
-            const uploadToNutCloud = async (username, password) => {
+            // 上传数据到 Gist
+            const uploadToGist = async (token, gistId) => {
                 try {
                     const tasks = await dataStorage.getAllTasks();
                     const exportData = {
@@ -5982,59 +6014,92 @@ const renderBatchCheckinItem = (item) => {
                         date: new Date().toISOString(),
                         tasks: tasks
                     };
-                    const dataStr = JSON.stringify(exportData, null, 2);
+                    const content = JSON.stringify(exportData, null, 2);
                     
-                    // 创建授权头
-                    const auth = btoa(`${username}:${password}`);
-                    const url = NUTSCLOUD_SERVER + BACKUP_FILE;
-                    
-                    const response = await fetch(url, {
-                        method: 'PUT',
-                        headers: {
-                            'Authorization': `Basic ${auth}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: dataStr
-                    });
-                    
-                    if (response.ok) {
-                        alert('✅ 上传成功！数据已保存到坚果云');
-                        return true;
-                    } else if (response.status === 401 || response.status === 403) {
-                        alert('❌ 账号或密码错误，请检查后重试');
-                        return false;
+                    if (gistId) {
+                        // 更新已有 Gist
+                        const response = await fetch(`${GIST_API}/${gistId}`, {
+                            method: 'PATCH',
+                            headers: {
+                                'Authorization': `token ${token}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                files: {
+                                    'checkin_backup.json': { content: content }
+                                }
+                            })
+                        });
+                        
+                        if (response.ok) {
+                            alert('✅ 上传成功！数据已更新到 Gist');
+                            return true;
+                        } else {
+                            const error = await response.json();
+                            throw new Error(error.message);
+                        }
                     } else {
-                        alert('❌ 上传失败：' + response.status);
-                        return false;
+                        // 创建新 Gist
+                        const response = await fetch(GIST_API, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `token ${token}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                description: '复习打卡计划备份',
+                                public: false,
+                                files: {
+                                    'checkin_backup.json': { content: content }
+                                }
+                            })
+                        });
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            const newGistId = data.id;
+                            saveGistSettings(token, newGistId);
+                            alert(`✅ 上传成功！Gist ID: ${newGistId}\n请记住此ID，其他设备输入相同Token和ID即可同步`);
+                            return true;
+                        } else {
+                            const error = await response.json();
+                            throw new Error(error.message);
+                        }
                     }
                 } catch (error) {
-                    alert('❌ 网络错误：' + error.message);
+                    alert('❌ 上传失败：' + error.message);
                     return false;
                 }
             };
             
-            // 从坚果云下载数据
-            const downloadFromNutCloud = async (username, password) => {
+            // 从 Gist 下载数据
+            const downloadFromGist = async (token, gistId) => {
                 try {
-                    const auth = btoa(`${username}:${password}`);
-                    const url = NUTSCLOUD_SERVER + BACKUP_FILE;
-                    
-                    const response = await fetch(url, {
+                    const response = await fetch(`${GIST_API}/${gistId}`, {
                         method: 'GET',
                         headers: {
-                            'Authorization': `Basic ${auth}`
+                            'Authorization': `token ${token}`,
+                            'Accept': 'application/vnd.github.v3+json'
                         }
                     });
                     
                     if (response.ok) {
-                        const cloudData = await response.json();
+                        const data = await response.json();
+                        const fileContent = data.files['checkin_backup.json']?.content;
+                        
+                        if (!fileContent) {
+                            alert('Gist 中没有找到备份文件');
+                            return false;
+                        }
+                        
+                        const cloudData = JSON.parse(fileContent);
                         
                         if (!cloudData.tasks) {
                             alert('云端数据格式错误');
                             return false;
                         }
                         
-                        if (!confirm('下载将覆盖当前所有数据，确定继续吗？')) return false;
+                        if (!confirm(`下载将覆盖当前所有数据，确定继续吗？\n云端备份时间：${new Date(cloudData.date).toLocaleString()}`)) return false;
                         
                         await dataStorage.clearAllData();
                         await dataStorage.saveAllTasks(cloudData.tasks);
@@ -6049,53 +6114,50 @@ const renderBatchCheckinItem = (item) => {
                         alert('✅ 下载成功！数据已恢复');
                         return true;
                     } else if (response.status === 404) {
-                        alert('❌ 云端还没有备份，请先在另一台设备上传');
-                        return false;
-                    } else if (response.status === 401 || response.status === 403) {
-                        alert('❌ 账号或密码错误，请检查后重试');
+                        alert('❌ 找不到指定的 Gist，请检查 Gist ID 是否正确');
                         return false;
                     } else {
-                        alert('❌ 下载失败：' + response.status);
-                        return false;
+                        const error = await response.json();
+                        throw new Error(error.message);
                     }
                 } catch (error) {
-                    alert('❌ 网络错误：' + error.message);
+                    alert('❌ 下载失败：' + error.message);
                     return false;
                 }
             };
             
-            // 显示坚果云设置弹窗
-            const showNutCloudDialog = () => {
-                const saved = getNutCloudAccount();
+            // 显示 Gist 设置弹窗
+            const showGistDialog = () => {
+                const saved = getGistSettings();
                 
                 const modal = document.createElement('div');
                 modal.className = 'modal';
                 modal.innerHTML = `
-                    <div class="modal-content" style="max-width: 450px;">
+                    <div class="modal-content" style="max-width: 500px;">
                         <div class="modal-header">
-                            <h3>☁️ 坚果云同步设置</h3>
-                            <button class="close-btn" id="close-nutcloud-modal">&times;</button>
+                            <h3>🐙 GitHub Gist 同步设置</h3>
+                            <button class="close-btn" id="close-gist-modal2">&times;</button>
                         </div>
                         <div class="modal-body">
                             <div class="form-group">
-                                <label>坚果云账号</label>
-                                <input type="text" id="nutcloud-username" placeholder="您的坚果云账号（邮箱）" value="${saved.username}">
+                                <label>GitHub Token</label>
+                                <input type="password" id="gist-token2" placeholder="输入 GitHub Personal Access Token" value="${saved.token}">
+                                <small>在 GitHub Settings → Developer settings → Personal access tokens 中生成</small>
                             </div>
                             <div class="form-group">
-                                <label>应用密码</label>
-                                <input type="password" id="nutcloud-password" placeholder="第三方应用密码" value="${saved.password}">
-                                <small>在坚果云【安全选项】中生成应用密码</small>
+                                <label>Gist ID</label>
+                                <input type="text" id="gist-id2" placeholder="Gist ID（首次留空自动创建）" value="${saved.gistId}">
+                                <small>第一次上传后会自动获取，其他设备需要输入相同ID</small>
                             </div>
                             <div class="info-box" style="padding: 12px; background: #e8f4fd; border-radius: 4px; margin: 15px 0;">
                                 <strong>📌 使用说明：</strong>
-                                <p style="margin: 5px 0 0; font-size: 13px;">1. 先在一个设备上点击"上传到云端"</p>
-                                <p style="margin: 5px 0 0; font-size: 13px;">2. 再到另一个设备点击"从云端下载"</p>
-                                <p style="margin: 5px 0 0; font-size: 13px;">3. 账号密码只保存在您的浏览器中</p>
+                                <p style="margin: 5px 0 0; font-size: 13px;">1. 第一台设备：输入Token → 点击"上传到Gist"</p>
+                                <p style="margin: 5px 0 0; font-size: 13px;">2. 第二台设备：输入相同Token和Gist ID → 点击"从Gist下载"</p>
                             </div>
                             <div class="task-actions" style="justify-content: flex-end;">
-                                <button class="btn" id="cancel-nutcloud-btn">取消</button>
-                                <button class="btn btn-primary" id="upload-nutcloud-btn" style="background: #3498db;">上传到云端</button>
-                                <button class="btn btn-success" id="download-nutcloud-btn" style="background: #27ae60;">从云端下载</button>
+                                <button class="btn" id="cancel-gist-btn2">取消</button>
+                                <button class="btn btn-primary" id="upload-gist-btn2" style="background: #28a745;">上传到 Gist</button>
+                                <button class="btn btn-success" id="download-gist-btn2" style="background: #1b6ec2;">从 Gist 下载</button>
                             </div>
                         </div>
                     </div>
@@ -6103,60 +6165,73 @@ const renderBatchCheckinItem = (item) => {
                 document.body.appendChild(modal);
                 
                 const closeModal = () => document.body.removeChild(modal);
-                const usernameInput = modal.querySelector('#nutcloud-username');
-                const passwordInput = modal.querySelector('#nutcloud-password');
+                const tokenInput = modal.querySelector('#gist-token2');
+                const gistIdInput = modal.querySelector('#gist-id2');
                 
-                modal.querySelector('#close-nutcloud-modal').onclick = closeModal;
-                modal.querySelector('#cancel-nutcloud-btn').onclick = closeModal;
+                modal.querySelector('#close-gist-modal2').onclick = closeModal;
+                modal.querySelector('#cancel-gist-btn2').onclick = closeModal;
                 
-                modal.querySelector('#upload-nutcloud-btn').onclick = async () => {
-                    const username = usernameInput.value.trim();
-                    const password = passwordInput.value.trim();
-                    if (!username || !password) {
-                        alert('请输入坚果云账号和应用密码');
+                modal.querySelector('#upload-gist-btn2').onclick = async () => {
+                    const token = tokenInput.value.trim();
+                    let gistId = gistIdInput.value.trim();
+                    
+                    if (!token) {
+                        alert('请输入 GitHub Token');
                         return;
                     }
                     
-                    saveNutCloudAccount(username, password);
-                    const btn = modal.querySelector('#upload-nutcloud-btn');
+                    const btn = modal.querySelector('#upload-gist-btn2');
                     btn.disabled = true;
                     btn.textContent = '上传中...';
-                    await uploadToNutCloud(username, password);
+                    
+                    await uploadToGist(token, gistId || null);
+                    
+                    // 更新保存的 Gist ID
+                    const saved = getGistSettings();
+                    if (saved.gistId && !gistId) {
+                        gistIdInput.value = saved.gistId;
+                    }
+                    saveGistSettings(token, gistIdInput.value);
+                    
                     closeModal();
                 };
                 
-                modal.querySelector('#download-nutcloud-btn').onclick = async () => {
-                    const username = usernameInput.value.trim();
-                    const password = passwordInput.value.trim();
-                    if (!username || !password) {
-                        alert('请输入坚果云账号和应用密码');
+                modal.querySelector('#download-gist-btn2').onclick = async () => {
+                    const token = tokenInput.value.trim();
+                    const gistId = gistIdInput.value.trim();
+                    
+                    if (!token) {
+                        alert('请输入 GitHub Token');
+                        return;
+                    }
+                    if (!gistId) {
+                        alert('请输入 Gist ID（从第一台设备获取）');
                         return;
                     }
                     
-                    saveNutCloudAccount(username, password);
-                    const btn = modal.querySelector('#download-nutcloud-btn');
+                    const btn = modal.querySelector('#download-gist-btn2');
                     btn.disabled = true;
                     btn.textContent = '下载中...';
-                    await downloadFromNutCloud(username, password);
+                    
+                    await downloadFromGist(token, gistId);
+                    saveGistSettings(token, gistId);
                     closeModal();
                 };
             };
             
-            // 设置云端同步按钮
-            const setupCloudSync = () => {
-                const cloudBtn = document.getElementById('cloud-sync-btn');
-                if (!cloudBtn) {
-                    console.log('找不到云端同步按钮');
-                    return;
+            // 设置 Gist 同步按钮
+            const setupGistSync = () => {
+                const gistBtn = document.getElementById('gist-sync-btn');
+                if (gistBtn) {
+                    gistBtn.onclick = () => {
+                        showGistDialog();
+                    };
+                    console.log('GitHub Gist 同步已就绪');
+                } else {
+                    console.log('找不到 Gist 同步按钮');
                 }
-                
-                cloudBtn.onclick = () => {
-                    showNutCloudDialog();
-                };
-                console.log('坚果云同步已就绪');
-            };
-
-            // 将需要暴露给全局的函数挂载到window对象
+            };            
+// 将需要暴露给全局的函数挂载到window对象
             window.startCheckin = startCheckin;
             window.showEditTaskForm = showEditTaskForm;
             window.viewTaskDetails = viewTaskDetails;
