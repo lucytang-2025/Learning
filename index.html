@@ -6270,11 +6270,14 @@ const renderBatchCheckinItem = (item) => {
                     };
                     const content = JSON.stringify(exportData, null, 2);
                     
-                    const response = await fetch(`${GIST_API}/${gistId}`, {
+                                        // 使用 CORS 代理
+                    const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
+                    const response = await fetch(proxyUrl + `${GIST_API}/${gistId}`, {
                         method: 'PATCH',
                         headers: {
                             'Authorization': `token ${token}`,
-                            'Content-Type': 'application/json'
+                            'Content-Type': 'application/json',
+                            'Origin': 'https://cors-anywhere.herokuapp.com'
                         },
                         body: JSON.stringify({
                             files: {
