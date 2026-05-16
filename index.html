@@ -6270,9 +6270,14 @@ const renderBatchCheckinItem = (item) => {
                     };
                     const content = JSON.stringify(exportData, null, 2);
                     
-                                        // 使用 CORS 代理
-                    const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
-                    const response = await fetch(proxyUrl + `${GIST_API}/${gistId}`, {
+                                        // 使用多个 CORS 代理（轮换）
+                    const proxies = [
+                        'https://api.allorigins.win/raw?url=',
+                        'https://corsproxy.io/?',
+                        'https://proxy.cors.sh/'
+                    ];
+                    const proxyUrl = proxies[Math.floor(Math.random() * proxies.length)];
+                    const response = await fetch(proxyUrl + encodeURIComponent(`${GIST_API}/${gistId}`), {
                         method: 'PATCH',
                         headers: {
                             'Authorization': `token ${token}`,
