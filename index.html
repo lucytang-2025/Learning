@@ -5954,10 +5954,27 @@ const renderBatchCheckinItem = (item) => {
                 if (isDisabled) { alert('今日已经打卡成功！'); return; }
                 startCheckin(taskId);
             };
-            // ==================== JSONBin云端同步（请填写您的API密钥）====================
-            const MY_API_KEY = '$2a$10$e/Wp7UebMHEgnI7Az56ks.DPtgPW3RjqBYMt3V.OAhtlaCS7lnYgC';  // ← 请替换为您的真实密钥
+                        // ==================== 坚果云云端同步 ====================
+            // 坚果云配置
+            const NUTSCLOUD_SERVER = 'https://dav.jianguoyun.com/dav/';
+            const BACKUP_FILE = 'checkin_backup.json';
             
-            const uploadToJSONBin = async () => {
+            // 保存坚果云账号密码
+            const saveNutCloudAccount = (username, password) => {
+                if (username) localStorage.setItem('nutcloud_username', username);
+                if (password) localStorage.setItem('nutcloud_password', password);
+            };
+            
+            // 读取坚果云账号密码
+            const getNutCloudAccount = () => {
+                return {
+                    username: localStorage.getItem('nutcloud_username') || '',
+                    password: localStorage.getItem('nutcloud_password') || ''
+                };
+            };
+            
+            // 上传数据到坚果云
+            const uploadToNutCloud = async (username, password) => {
                 try {
                     const tasks = await dataStorage.getAllTasks();
                     const exportData = {
@@ -5967,20 +5984,25 @@ const renderBatchCheckinItem = (item) => {
                     };
                     const dataStr = JSON.stringify(exportData, null, 2);
                     
-                    const response = await fetch('https://api.jsonbin.io/v3/b', {
-                        method: 'POST',
+                    // 创建授权头
+                    const auth = btoa(`${username}:${password}`);
+                    const url = NUTSCLOUD_SERVER + BACKUP_FILE;
+                    
+                    const response = await fetch(url, {
+                        method: 'PUT',
                         headers: {
-                            'Content-Type': 'application/json',
-                            'X-Master-Key': MY_API_KEY
+                            'Authorization': `Basic ${auth}`,
+                            'Content-Type': 'application/json'
                         },
                         body: dataStr
                     });
                     
                     if (response.ok) {
-                        const result = await response.json();
-                        localStorage.setItem('jsonbin_id', result.metadata.id);
-                        alert('✅ 上传成功！数据已保存到云端');
+                        alert('✅ 上传成功！数据已保存到坚果云');
                         return true;
+                    } else if (response.status === 401 || response.status === 403) {
+                        alert('❌ 账号或密码错误，请检查后重试');
+                        return false;
                     } else {
                         alert('❌ 上传失败：' + response.status);
                         return false;
@@ -5991,19 +6013,26 @@ const renderBatchCheckinItem = (item) => {
                 }
             };
             
-            const downloadFromJSONBin = async () => {
+            // 从坚果云下载数据
+            const downloadFromNutCloud = async (username, password) => {
                 try {
-                    const binId = localStorage.getItem('jsonbin_id');
-                    if (!binId) {
-                        alert('还没有备份，请先在当前设备上传');
-                        return false;
-                    }
+                    const auth = btoa(`${username}:${password}`);
+                    const url = NUTSCLOUD_SERVER + BACKUP_FILE;
                     
-                    const response = await fetch(`https://api.jsonbin.io/v3/b/${binId}/latest`);
+                    const response = await fetch(url, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Basic ${auth}`
+                        }
+                    });
                     
                     if (response.ok) {
-                        const result = await response.json();
-                        const cloudData = result.record;
+                        const cloudData = await response.json();
+                        
+                        if (!cloudData.tasks) {
+                            alert('云端数据格式错误');
+                            return false;
+                        }
                         
                         if (!confirm('下载将覆盖当前所有数据，确定继续吗？')) return false;
                         
@@ -6020,7 +6049,10 @@ const renderBatchCheckinItem = (item) => {
                         alert('✅ 下载成功！数据已恢复');
                         return true;
                     } else if (response.status === 404) {
-                        alert('云端没有找到备份，请先在其他设备上传');
+                        alert('❌ 云端还没有备份，请先在另一台设备上传');
+                        return false;
+                    } else if (response.status === 401 || response.status === 403) {
+                        alert('❌ 账号或密码错误，请检查后重试');
                         return false;
                     } else {
                         alert('❌ 下载失败：' + response.status);
@@ -6032,18 +6064,96 @@ const renderBatchCheckinItem = (item) => {
                 }
             };
             
+            // 显示坚果云设置弹窗
+            const showNutCloudDialog = () => {
+                const saved = getNutCloudAccount();
+                
+                const modal = document.createElement('div');
+                modal.className = 'modal';
+                modal.innerHTML = `
+                    <div class="modal-content" style="max-width: 450px;">
+                        <div class="modal-header">
+                            <h3>☁️ 坚果云同步设置</h3>
+                            <button class="close-btn" id="close-nutcloud-modal">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="form-group">
+                                <label>坚果云账号</label>
+                                <input type="text" id="nutcloud-username" placeholder="您的坚果云账号（邮箱）" value="${saved.username}">
+                            </div>
+                            <div class="form-group">
+                                <label>应用密码</label>
+                                <input type="password" id="nutcloud-password" placeholder="第三方应用密码" value="${saved.password}">
+                                <small>在坚果云【安全选项】中生成应用密码</small>
+                            </div>
+                            <div class="info-box" style="padding: 12px; background: #e8f4fd; border-radius: 4px; margin: 15px 0;">
+                                <strong>📌 使用说明：</strong>
+                                <p style="margin: 5px 0 0; font-size: 13px;">1. 先在一个设备上点击"上传到云端"</p>
+                                <p style="margin: 5px 0 0; font-size: 13px;">2. 再到另一个设备点击"从云端下载"</p>
+                                <p style="margin: 5px 0 0; font-size: 13px;">3. 账号密码只保存在您的浏览器中</p>
+                            </div>
+                            <div class="task-actions" style="justify-content: flex-end;">
+                                <button class="btn" id="cancel-nutcloud-btn">取消</button>
+                                <button class="btn btn-primary" id="upload-nutcloud-btn" style="background: #3498db;">上传到云端</button>
+                                <button class="btn btn-success" id="download-nutcloud-btn" style="background: #27ae60;">从云端下载</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+                
+                const closeModal = () => document.body.removeChild(modal);
+                const usernameInput = modal.querySelector('#nutcloud-username');
+                const passwordInput = modal.querySelector('#nutcloud-password');
+                
+                modal.querySelector('#close-nutcloud-modal').onclick = closeModal;
+                modal.querySelector('#cancel-nutcloud-btn').onclick = closeModal;
+                
+                modal.querySelector('#upload-nutcloud-btn').onclick = async () => {
+                    const username = usernameInput.value.trim();
+                    const password = passwordInput.value.trim();
+                    if (!username || !password) {
+                        alert('请输入坚果云账号和应用密码');
+                        return;
+                    }
+                    
+                    saveNutCloudAccount(username, password);
+                    const btn = modal.querySelector('#upload-nutcloud-btn');
+                    btn.disabled = true;
+                    btn.textContent = '上传中...';
+                    await uploadToNutCloud(username, password);
+                    closeModal();
+                };
+                
+                modal.querySelector('#download-nutcloud-btn').onclick = async () => {
+                    const username = usernameInput.value.trim();
+                    const password = passwordInput.value.trim();
+                    if (!username || !password) {
+                        alert('请输入坚果云账号和应用密码');
+                        return;
+                    }
+                    
+                    saveNutCloudAccount(username, password);
+                    const btn = modal.querySelector('#download-nutcloud-btn');
+                    btn.disabled = true;
+                    btn.textContent = '下载中...';
+                    await downloadFromNutCloud(username, password);
+                    closeModal();
+                };
+            };
+            
+            // 设置云端同步按钮
             const setupCloudSync = () => {
                 const cloudBtn = document.getElementById('cloud-sync-btn');
-                if (!cloudBtn) return;
+                if (!cloudBtn) {
+                    console.log('找不到云端同步按钮');
+                    return;
+                }
                 
-                cloudBtn.onclick = async () => {
-                    const choice = confirm('请选择：\n\n按【确定】上传数据到云端\n按【取消】从云端下载数据');
-                    if (choice) {
-                        await uploadToJSONBin();
-                    } else {
-                        await downloadFromJSONBin();
-                    }
+                cloudBtn.onclick = () => {
+                    showNutCloudDialog();
                 };
+                console.log('坚果云同步已就绪');
             };
 
             // 将需要暴露给全局的函数挂载到window对象
