@@ -533,6 +533,44 @@
             color: white;
             margin-right: 10px;
         }
+/* 可折叠卡片样式 */
+.collapsible-card {
+    border-radius: 8px;
+    margin-bottom: 15px;
+}
+.collapsible-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    padding: 12px 15px;
+    background: #f0f9ff;
+    border-radius: 8px;
+    transition: background 0.2s;
+}
+.collapsible-header:hover {
+    background: #e0f0fe;
+}
+.collapsible-header h4 {
+    margin: 0;
+    font-size: 16px;
+}
+.collapsible-icon {
+    font-size: 18px;
+    transition: transform 0.3s;
+}
+.collapsible-icon.collapsed {
+    transform: rotate(-90deg);
+}
+.collapsible-content {
+    padding: 15px;
+    background: #f8fafc;
+    border-radius: 0 0 8px 8px;
+    transition: all 0.3s;
+}
+.collapsible-content.collapsed {
+    display: none;
+}
     </style>
 </head>
 <body>
@@ -993,24 +1031,29 @@
                 <div class="data-card" style="background: white; border-radius: 10px; padding: 20px;">
                     <h3>数据备份与恢复</h3>
                     <p>将数据导出为JSON文件进行备份，或从备份文件恢复数据。</p>
-<div style="background: #f0f9ff; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
-    <h4 style="margin-bottom: 10px;">🌐 云同步设置</h4>
-    <div class="form-group" style="margin-bottom: 10px;">
-        <label for="user-github-token">GitHub Token</label>
-        <input type="password" id="user-github-token" placeholder="输入您的 GitHub Token" style="width: 100%;">
-        <small style="font-size: 11px; color: #64748b;">获取方法：GitHub Settings → Developer settings → Personal access tokens → 勾选 gist 权限</small>
+<div class="collapsible-card" style="background: #f0f9ff; border-radius: 8px; margin-bottom: 15px;">
+    <div class="collapsible-header" onclick="window.toggleCloudSync()">
+        <h4 style="margin-bottom: 0;">🌐 云同步设置</h4>
+        <span class="collapsible-icon" id="cloud-sync-icon">▼</span>
     </div>
-    <div class="form-group" style="margin-bottom: 10px;">
-        <label for="user-gist-id">Gist ID</label>
-        <input type="text" id="user-gist-id" placeholder="输入您的 Gist ID" style="width: 100%;">
-        <small style="font-size: 11px; color: #64748b;">获取方法：创建 Gist 后，复制地址栏中的 ID</small>
+    <div class="collapsible-content" id="cloud-sync-content">
+        <div class="form-group" style="margin-bottom: 10px;">
+            <label for="user-github-token">GitHub Token</label>
+            <input type="password" id="user-github-token" placeholder="输入您的 GitHub Token" style="width: 100%;">
+            <small style="font-size: 11px; color: #64748b;">获取方法：GitHub Settings → Developer settings → Personal access tokens → 勾选 gist 权限</small>
+        </div>
+        <div class="form-group" style="margin-bottom: 10px;">
+            <label for="user-gist-id">Gist ID</label>
+            <input type="text" id="user-gist-id" placeholder="输入您的 Gist ID" style="width: 100%;">
+            <small style="font-size: 11px; color: #64748b;">获取方法：创建 Gist 后，复制地址栏中的 ID</small>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn" id="save-sync-config-btn" style="background: #4facfe; color: white;">保存设置</button>
+            <button class="btn" id="test-sync-config-btn" style="background: #ff9f43; color: white;">测试连接</button>
+            <button class="btn" id="clear-sync-config-btn" style="background: #e2e8f0;">清除设置</button>
+        </div>
+        <div id="sync-status" style="margin-top: 10px; font-size: 12px; color: #64748b;"></div>
     </div>
-    <div style="display: flex; gap: 10px;">
-        <button class="btn" id="save-sync-config-btn" style="background: #4facfe; color: white;">保存设置</button>
-        <button class="btn" id="test-sync-config-btn" style="background: #ff9f43; color: white;">测试连接</button>
-        <button class="btn" id="clear-sync-config-btn" style="background: #e2e8f0;">清除设置</button>
-    </div>
-    <div id="sync-status" style="margin-top: 10px; font-size: 12px; color: #64748b;"></div>
 </div>
                     
                     <div class="data-actions" style="display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap;">
@@ -1574,8 +1617,9 @@
             
             
             // 自动同步：下载云端数据并合并
-            const autoDownload = async () => {
-                if (!SYNC_CONFIG.gistId) return;
+const autoDownload = async () => {
+    const config = getSyncConfig();  // ✅ 正确
+    if (!config.gistId) return;
                 
                 try {
                     const cloudData = await downloadFromGist();
@@ -1599,8 +1643,7 @@
                     console.error('自动下载失败:', error);
                     return false;
                 }
-            };
-            
+            };            
             // 合并任务数据（保留本地未同步的打卡记录）
             const mergeTasks = (localTasks, cloudTasks) => {
                 const taskMap = new Map();
@@ -1656,6 +1699,40 @@
                     }
                 }
             };
+// 自动上传（新增）
+const autoUpload = async () => {
+    const config = getSyncConfig();
+    if (!config.token || !config.gistId) {
+        console.log('未配置同步账号，跳过自动上传');
+        return false;
+    }
+    
+    try {
+        const tasks = await dataStorage.getAllTasks();
+        const recordings = await dataStorage.getAllRecordings();
+        const photos = await dataStorage.getAllPhotos();
+        const feedbacks = await dataStorage.getAllFromStore('feedbacks');
+        
+        const uploadData = {
+            version: '3.0',
+            lastSyncTime: new Date().toISOString(),
+            tasks: tasks,
+            recordings: recordings,
+            photos: photos,
+            feedbacks: feedbacks
+        };
+        
+        const success = await uploadToGist(uploadData);
+        if (success) {
+            console.log('自动同步到云端成功');
+            localStorage.setItem('tasks_last_modified', uploadData.lastSyncTime);
+        }
+        return success;
+    } catch (error) {
+        console.error('自动上传失败:', error);
+        return false;
+    }
+};
             
             // 手动下载（强制下载云端数据）
             const manualDownload = async () => {
@@ -1689,14 +1766,40 @@
             };
             
             // 设置定时自动同步（每5分钟自动上传一次）
-            const setupAutoSync = () => {
-                setInterval(async () => {
-                    // 如果有数据变化，自动上传
-                    if (state.tasks.length > 0) {
-                        await autoUpload();
-                    }
-                }, 5 * 60 * 1000); // 5分钟
-            };
+const setupAutoSync = () => {
+    setInterval(async () => {
+        if (state.tasks.length > 0) {
+            // 先下载最新数据，再上传本地数据
+            await autoDownload();
+            await autoUpload();
+        }
+    }, 5 * 60 * 1000); // 5分钟
+};
+// 云同步设置折叠功能
+const toggleCloudSync = () => {
+    const content = document.getElementById('cloud-sync-content');
+    const icon = document.getElementById('cloud-sync-icon');
+    if (content) {
+        content.classList.toggle('collapsed');
+        icon.classList.toggle('collapsed');
+        // 保存折叠状态到 localStorage
+        const isCollapsed = content.classList.contains('collapsed');
+        localStorage.setItem('cloudSyncCollapsed', isCollapsed);
+    }
+};
+
+// 恢复折叠状态
+const restoreCloudSyncState = () => {
+    const isCollapsed = localStorage.getItem('cloudSyncCollapsed') === 'true';
+    const content = document.getElementById('cloud-sync-content');
+    const icon = document.getElementById('cloud-sync-icon');
+    if (content && isCollapsed) {
+        content.classList.add('collapsed');
+        if (icon) icon.classList.add('collapsed');
+    }
+};
+window.toggleCloudSync = toggleCloudSync;
+window.restoreCloudSyncState = restoreCloudSyncState;
             // ==================== 全局状态 ====================
             const state = {
                 tasks: [],
@@ -2551,6 +2654,7 @@ const scrollToTask = (taskId) => {
                     renderAllTasks();
                     renderTodayTasks();
                 }, 3000);
+restoreCloudSyncState();
                 console.log('应用初始化完成');
             };
 
