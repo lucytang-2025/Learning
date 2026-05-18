@@ -2370,21 +2370,7 @@ const scrollToTask = (taskId) => {
                 setupMemoryMonitoring();
                 setupSubtaskEventListeners();
                 setupAutoCleanup();
-            const initApp = async () => {
-                console.log('初始化应用...');
-                await loadLocalData();
-                setupEventListeners();
-                setupCheckinEventListeners();
-                setupDataManagementEventListeners();
-                setupRecordingsManageEventListeners();
-                setupMemoryMonitoring();
-                setupSubtaskEventListeners();
-                setupAutoCleanup();
-                setupDailyAutoUpload();  // 添加这一行：启动每日自动上传
-                setupGistSync();
-                
-                // ... 其余代码保持不变
-            };
+                setupDailyAutoUpload();  // 启动每日自动上传
                 setupGistSync();
                 
                 restoreRecordingUrls();
@@ -2405,7 +2391,6 @@ const scrollToTask = (taskId) => {
                 await checkAndResumePausedTasks();
                 console.log('应用初始化完成');
             };
-
             const loadLocalData = async () => {
     try {
         state.tasks = await dataStorage.getAllTasks();
@@ -6361,10 +6346,85 @@ const renderBatchCheckinItem = (item) => {
                     console.log('找不到 Gist 同步按钮');
                 }
                 
+                // 绑定手动备份按钮事件
+                const manualBackupBtn = document.getElementById('manual-upload-btn');
+                if (manualBackupBtn) {
+                    manualBackupBtn.onclick = () => {
+                        manualBackupToCloud();
+                    };
+                    console.log('手动备份按钮已绑定');
+                } else {
+                    console.log('找不到手动备份按钮');
+                }
+                
                 // 更新上次自动备份时间显示
                 updateLastUploadTimeDisplay();
             };
-            
+            // 手动备份到云端（立即执行）
+            const manualBackupToCloud = async () => {
+                const { token, gistId } = getGistSettings();
+                
+                if (!token || !gistId) {
+                    alert('❌ 请先在 GitHub Gist 同步中配置 Token 和 Gist ID');
+                    return false;
+                }
+                
+                const btn = document.getElementById('manual-upload-btn');
+                const originalText = btn ? btn.textContent : '';
+                if (btn) {
+                    btn.disabled = true;
+                    btn.textContent = '备份中...';
+                }
+                
+                try {
+                    const tasks = state.tasks;
+                    if (!tasks || tasks.length === 0) {
+                        alert('没有任务数据可以备份');
+                        return false;
+                    }
+                    
+                    const exportData = {
+                        version: '3.0',
+                        date: new Date().toISOString(),
+                        tasks: tasks
+                    };
+                    const content = JSON.stringify(exportData, null, 2);
+                    
+                    const response = await fetch(`${GIST_API}/${gistId}`, {
+                        method: 'PATCH',
+                        headers: {
+                            'Authorization': `token ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            files: {
+                                'checkin_backup.json': { content: content }
+                            }
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        const today = new Date().toDateString();
+                        localStorage.setItem('last_auto_upload_date', today);
+                        updateLastUploadTimeDisplay();
+                        alert('✅ 手动备份成功！数据已保存到云端');
+                        console.log('手动备份成功');
+                        return true;
+                    } else {
+                        const error = await response.json();
+                        throw new Error(error.message);
+                    }
+                } catch (error) {
+                    console.error('手动备份失败:', error);
+                    alert('❌ 备份失败：' + error.message);
+                    return false;
+                } finally {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.textContent = originalText || '立即备份到云端';
+                    }
+                }
+            };
             // 更新上次自动上传时间显示
             const updateLastUploadTimeDisplay = () => {
                 const lastUploadDate = localStorage.getItem('last_auto_upload_date');
@@ -6378,7 +6438,8 @@ const renderBatchCheckinItem = (item) => {
                         timeElement.style.color = '#ff9f43';
                     }
                 }
-            };// 将需要暴露给全局的函数挂载到window对象
+            };
+// 将需要暴露给全局的函数挂载到window对象
             window.startCheckin = startCheckin;
             window.showEditTaskForm = showEditTaskForm;
             window.viewTaskDetails = viewTaskDetails;
