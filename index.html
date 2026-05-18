@@ -1761,35 +1761,67 @@ const autoUpload = async () => {
     }
 };            
             // 手动下载（强制下载云端数据）
-            const manualDownload = async () => {
-                const downloadBtn = document.getElementById('manual-download-btn');
-                if (downloadBtn) {
-                    downloadBtn.textContent = '下载中...';
-                    downloadBtn.disabled = true;
-                }
-                
-                try {
-                    const cloudData = await downloadFromGist();
-                    if (cloudData && cloudData.tasks) {
-                        state.tasks = mergeTasks(state.tasks, cloudData.tasks);
-                        await saveTasks();
-                        renderAllTasks();
-                        renderTodayTasks();
-                        renderCalendar();
-                        renderDataStats();
-                        alert('已从云端同步最新数据！');
-                    } else {
-                        alert('云端暂无数据，请先在另一台设备上传同步。');
-                    }
-                } catch (error) {
-                    alert('下载失败：' + error.message);
-                } finally {
-                    if (downloadBtn) {
-                        downloadBtn.textContent = '下载同步';
-                        downloadBtn.disabled = false;
-                    }
-                }
-            };
+const manualDownload = async () => {
+    const downloadBtn = document.getElementById('manual-download-btn');
+    if (downloadBtn) {
+        downloadBtn.textContent = '下载中...';
+        downloadBtn.disabled = true;
+    }
+    
+    try {
+        const cloudData = await downloadFromGist();
+        if (cloudData && cloudData.tasks) {
+            // 获取云端数据的最后同步时间
+            const cloudLastSyncTime = cloudData.lastSyncTime;
+            let timeDisplay = '';
+            
+            if (cloudLastSyncTime) {
+                const syncDate = new Date(cloudLastSyncTime);
+                timeDisplay = `\n📅 云端数据时间: ${syncDate.toLocaleString('zh-CN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                })}`;
+            }
+            
+            // 获取本地最后同步时间
+            const localLastSyncTime = localStorage.getItem('tasks_last_modified');
+            let localTimeDisplay = '';
+            if (localLastSyncTime) {
+                const localDate = new Date(localLastSyncTime);
+                localTimeDisplay = `\n💻 本地上次同步: ${localDate.toLocaleString('zh-CN')}`;
+            }
+            
+            // 比较时间，判断是否真的更新了
+            const isNewer = cloudLastSyncTime && (!localLastSyncTime || cloudLastSyncTime > localLastSyncTime);
+            
+            state.tasks = mergeTasks(state.tasks, cloudData.tasks);
+            await saveTasks();
+            localStorage.setItem('tasks_last_modified', cloudLastSyncTime || new Date().toISOString());
+            renderAllTasks();
+            renderTodayTasks();
+            renderCalendar();
+            renderDataStats();
+            
+            // 显示详细信息
+            const statusIcon = isNewer ? '✅' : '📥';
+            const statusMsg = isNewer ? '已从云端同步最新数据' : '已从云端同步数据（本地数据较新）';
+            alert(`${statusIcon} ${statusMsg}${timeDisplay}${localTimeDisplay}`);
+        } else {
+            alert('云端暂无数据，请先在另一台设备上传同步。');
+        }
+    } catch (error) {
+        alert('下载失败：' + error.message);
+    } finally {
+        if (downloadBtn) {
+            downloadBtn.textContent = '下载同步';
+            downloadBtn.disabled = false;
+        }
+    }
+};
             
             // 设置定时自动同步（每5分钟自动上传一次）
 const setupAutoSync = () => {
