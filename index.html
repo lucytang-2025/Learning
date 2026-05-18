@@ -1007,6 +1007,20 @@
                 </div>
                 
                 <div class="data-card" style="background: white; border-radius: 10px; padding: 20px;">
+                <div class="data-card" style="background: white; border-radius: 10px; padding: 20px;">
+                    <h3>云端备份状态</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <div style="font-size: 12px; color: #64748b;">上次自动备份</div>
+                            <div id="last-auto-upload-time" style="font-size: 14px; font-weight: 600; color: #28a745;">未备份</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 12px; color: #64748b;">下次备份时间</div>
+                            <div style="font-size: 14px; font-weight: 600;">每天凌晨 1:00</div>
+                        </div>
+                        <button class="btn" id="manual-upload-btn" style="background: #28a745; color: white;">立即备份到云端</button>
+                    </div>
+                </div>
                     <h3>数据统计</h3>
                     <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
                         <div class="stat-card" style="background: #f8fafc; border-radius: 8px; padding: 15px; text-align: center; border-left: 4px solid #4facfe;">
@@ -2194,6 +2208,107 @@
                 }
             };
 
+            // ==================== 每日凌晨自动上传 ====================
+            // 执行每日自动上传（凌晨1点）
+            const performDailyAutoUpload = async () => {
+                console.log('执行每日自动上传检查...');
+                const { token, gistId } = getGistSettings();
+                
+                if (!token || !gistId) {
+                    console.log('未配置 GitHub Gist，跳过自动上传');
+                    return false;
+                }
+                
+                // 检查今天是否已经上传过
+                const lastUploadDate = localStorage.getItem('last_auto_upload_date');
+                const today = new Date().toDateString();
+                
+                if (lastUploadDate === today) {
+                    console.log('今天已经自动上传过，跳过');
+                    return false;
+                }
+                
+                try {
+                    const tasks = state.tasks;
+                    if (!tasks || tasks.length === 0) {
+                        console.log('没有任务数据，跳过自动上传');
+                        return false;
+                    }
+                    
+                    const exportData = {
+                        version: '3.0',
+                        date: new Date().toISOString(),
+                        tasks: tasks
+                    };
+                    const content = JSON.stringify(exportData, null, 2);
+                    
+                    const response = await fetch(`${GIST_API}/${gistId}`, {
+                        method: 'PATCH',
+                        headers: {
+                            'Authorization': `token ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            files: {
+                                'checkin_backup.json': { content: content }
+                            }
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        localStorage.setItem('last_auto_upload_date', today);
+                        console.log(`✅ 每日自动上传成功！时间: ${new Date().toLocaleString()}`);
+                        
+                        // 显示提示（仅在页面可见时显示）
+                        if (document.visibilityState === 'visible') {
+                            const toast = document.createElement('div');
+                            toast.textContent = '☁️ 已自动备份到云端';
+                            toast.style.cssText = 'position: fixed; bottom: 20px; right: 20px; background: #28a745; color: white; padding: 8px 16px; border-radius: 20px; font-size: 12px; z-index: 10000; animation: fadeInOut 2s ease;';
+                            document.body.appendChild(toast);
+                            setTimeout(() => toast.remove(), 2000);
+                        }
+                        return true;
+                    } else {
+                        console.error('每日自动上传失败:', response.status);
+                        return false;
+                    }
+                } catch (error) {
+                    console.error('每日自动上传错误:', error);
+                    return false;
+                }
+            };
+            
+            // 启动每日自动上传定时器（每天凌晨1点执行）
+            const setupDailyAutoUpload = () => {
+                // 清除可能存在的旧定时器
+                if (window.dailyUploadInterval) {
+                    clearInterval(window.dailyUploadInterval);
+                }
+                
+                // 每小时检查一次，在凌晨1点执行上传
+                window.dailyUploadInterval = setInterval(async () => {
+                    const now = new Date();
+                    const hours = now.getHours();
+                    const minutes = now.getMinutes();
+                    
+                    // 在凌晨1:00 - 1:05之间执行
+                    if (hours === 1 && minutes < 5) {
+                        await performDailyAutoUpload();
+                    }
+                }, 60 * 1000); // 每分钟检查一次
+                
+                console.log('每日自动上传定时器已启动（每天凌晨1点）');
+                
+                // 页面加载时，如果上次上传超过24小时，也执行一次
+                const lastUploadDate = localStorage.getItem('last_auto_upload_date');
+                const today = new Date().toDateString();
+                if (lastUploadDate !== today) {
+                    // 延迟30秒后执行，避免影响页面加载
+                    setTimeout(async () => {
+                        await performDailyAutoUpload();
+                    }, 30000);
+                }
+            };
             const setupAutoCleanup = () => {
                 state.cleanupInterval = setInterval(async () => {
                     const now = new Date();
@@ -2255,6 +2370,21 @@ const scrollToTask = (taskId) => {
                 setupMemoryMonitoring();
                 setupSubtaskEventListeners();
                 setupAutoCleanup();
+            const initApp = async () => {
+                console.log('初始化应用...');
+                await loadLocalData();
+                setupEventListeners();
+                setupCheckinEventListeners();
+                setupDataManagementEventListeners();
+                setupRecordingsManageEventListeners();
+                setupMemoryMonitoring();
+                setupSubtaskEventListeners();
+                setupAutoCleanup();
+                setupDailyAutoUpload();  // 添加这一行：启动每日自动上传
+                setupGistSync();
+                
+                // ... 其余代码保持不变
+            };
                 setupGistSync();
                 
                 restoreRecordingUrls();
@@ -6230,8 +6360,25 @@ const renderBatchCheckinItem = (item) => {
                 } else {
                     console.log('找不到 Gist 同步按钮');
                 }
-            };            
-// 将需要暴露给全局的函数挂载到window对象
+                
+                // 更新上次自动备份时间显示
+                updateLastUploadTimeDisplay();
+            };
+            
+            // 更新上次自动上传时间显示
+            const updateLastUploadTimeDisplay = () => {
+                const lastUploadDate = localStorage.getItem('last_auto_upload_date');
+                const timeElement = document.getElementById('last-auto-upload-time');
+                if (timeElement) {
+                    if (lastUploadDate) {
+                        timeElement.textContent = lastUploadDate;
+                        timeElement.style.color = '#28a745';
+                    } else {
+                        timeElement.textContent = '尚未备份';
+                        timeElement.style.color = '#ff9f43';
+                    }
+                }
+            };// 将需要暴露给全局的函数挂载到window对象
             window.startCheckin = startCheckin;
             window.showEditTaskForm = showEditTaskForm;
             window.viewTaskDetails = viewTaskDetails;
