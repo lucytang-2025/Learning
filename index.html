@@ -1018,6 +1018,22 @@
                             <div style="font-size: 12px; color: #64748b;">下次备份时间</div>
                             <div style="font-size: 14px; font-weight: 600;">每天凌晨 1:00</div>
                         </div>
+                        <div>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="checkbox" id="auto-upload-toggle" checked style="width: 18px; height: 18px;">
+                                <span style="font-size: 13px;">📤 自动备份到云端</span>
+                            </label>
+                        </div>
+                        <div>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="checkbox" id="auto-download-toggle" style="width: 18px; height: 18px;">
+                                <span style="font-size: 13px;">📥 自动同步云端数据</span>
+                            </label>
+                        </div>
+                        <button class="btn" id="manual-upload-btn" style="background: #28a745; color: white;">立即备份到云端</button>
+                    </div>
+                    <div id="auto-download-status" style="margin-top: 10px; font-size: 12px; color: #64748b; text-align: center;"></div>
+                </div>
                         <button class="btn" id="manual-upload-btn" style="background: #28a745; color: white;">立即备份到云端</button>
                     </div>
                 </div>
@@ -2280,6 +2296,35 @@
             
             // 启动每日自动上传定时器（每天凌晨1点执行）
             const setupDailyAutoUpload = () => {
+                // 检查用户是否开启了自动备份（每台设备独立设置，存储在localStorage）
+                let isAutoUploadEnabled = localStorage.getItem('auto_upload_enabled');
+                if (isAutoUploadEnabled === null) {
+                    isAutoUploadEnabled = true;
+                    localStorage.setItem('auto_upload_enabled', 'true');
+                } else {
+                    isAutoUploadEnabled = isAutoUploadEnabled === 'true';
+                }                
+                // 绑定上传开关事件
+                const uploadToggle = document.getElementById('auto-upload-toggle');
+                if (uploadToggle) {
+                    uploadToggle.checked = isAutoUploadEnabled;
+                    uploadToggle.addEventListener('change', (e) => {
+                        const isChecked = e.target.checked;
+                        localStorage.setItem('auto_upload_enabled', isChecked);
+                        if (isChecked) {
+                            console.log('✅ 自动备份到云端已开启');
+                            setTimeout(() => {
+                                performDailyAutoUpload();
+                            }, 1000);
+                        } else {
+                            console.log('⏸️ 自动备份到云端已关闭');
+                        }
+                    });
+                }                
+                if (!isAutoUploadEnabled) {
+                    console.log('⏸️ 自动备份到云端已关闭，跳过启动定时器');
+                    return;
+                }                
                 // 清除可能存在的旧定时器
                 if (window.dailyUploadInterval) {
                     clearInterval(window.dailyUploadInterval);
@@ -2287,6 +2332,13 @@
                 
                 // 每小时检查一次，在凌晨1点执行上传
                 window.dailyUploadInterval = setInterval(async () => {
+                    // 每次执行前重新检查开关状态
+                    const isStillEnabled = localStorage.getItem('auto_upload_enabled') === 'true';
+                    if (!isStillEnabled) {
+                        console.log('⏸️ 自动备份已关闭，跳过本次检查');
+                        return;
+                    }
+                    
                     const now = new Date();
                     const hours = now.getHours();
                     const minutes = now.getMinutes();
@@ -2297,7 +2349,7 @@
                     }
                 }, 60 * 1000); // 每分钟检查一次
                 
-                console.log('每日自动上传定时器已启动（每天凌晨1点）');
+                console.log('✅ 每日自动上传定时器已启动（每天凌晨1点）');
                 
                 // 页面加载时，如果上次上传超过24小时，也执行一次
                 const lastUploadDate = localStorage.getItem('last_auto_upload_date');
@@ -2305,9 +2357,160 @@
                 if (lastUploadDate !== today) {
                     // 延迟30秒后执行，避免影响页面加载
                     setTimeout(async () => {
-                        await performDailyAutoUpload();
+                        // 再次检查开关状态
+                        const isStillEnabled = localStorage.getItem('auto_upload_enabled') === 'true';
+                        if (isStillEnabled) {
+                            await performDailyAutoUpload();
+                        }
                     }, 30000);
                 }
+            };
+            // ==================== 自动下载同步（定时检查云端更新）====================
+            // 执行自动下载检查
+            const performAutoDownload = async () => {
+                console.log('执行自动下载检查...');
+                const { token, gistId } = getGistSettings();
+                
+                if (!token || !gistId) {
+                    console.log('未配置 GitHub Gist，跳过自动下载');
+                    return false;
+                }
+                
+                try {
+                    const response = await fetch(`${GIST_API}/${gistId}`, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `token ${token}`,
+                            'Accept': 'application/vnd.github.v3+json'
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        const fileContent = data.files['checkin_backup.json']?.content;
+                        if (!fileContent) return false;
+                        
+                        const cloudData = JSON.parse(fileContent);
+                        if (!cloudData.tasks) return false;
+                        
+                        // 获取云端数据的修改时间
+                        const cloudDate = new Date(cloudData.date);
+                        const lastSyncTime = localStorage.getItem('last_sync_time') || '0';
+                        const lastSyncDate = new Date(lastSyncTime);
+                        
+                        // 如果云端数据比本地同步时间新，则下载
+                        if (cloudDate > lastSyncDate) {
+                            console.log(`检测到云端有新数据 (${cloudData.date})，开始自动下载...`);
+                            
+                            await dataStorage.clearAllData();
+                            await dataStorage.saveAllTasks(cloudData.tasks);
+                            await loadLocalData();
+                            restoreRecordingUrls();
+                            renderTodayTasks();
+                            renderAllTasks();
+                            renderCalendar();
+                            renderRecordings();
+                            renderDataStats();
+                            
+                            localStorage.setItem('last_sync_time', new Date().toISOString());
+                            
+                            // 显示提示
+                            if (document.visibilityState === 'visible') {
+                                const toast = document.createElement('div');
+                                toast.textContent = '📥 已自动同步云端最新数据';
+                                toast.style.cssText = 'position: fixed; bottom: 20px; right: 20px; background: #4facfe; color: white; padding: 8px 16px; border-radius: 20px; font-size: 12px; z-index: 10000; animation: fadeInOut 2s ease;';
+                                document.body.appendChild(toast);
+                                setTimeout(() => toast.remove(), 2000);
+                            }
+                            
+                            console.log('✅ 自动下载完成');
+                            return true;
+                        } else {
+                            console.log('云端无新数据');
+                        }
+                    }
+                    return false;
+                } catch (error) {
+                    console.error('自动下载检查失败:', error);
+                    return false;
+                }
+            };
+            
+            // 启动自动下载定时器（每30分钟检查一次）
+            const setupAutoDownload = () => {
+                let isAutoDownloadEnabled = localStorage.getItem('auto_download_enabled');
+                if (isAutoDownloadEnabled === null) {
+                    isAutoDownloadEnabled = false;  // 默认关闭
+                    localStorage.setItem('auto_download_enabled', 'false');
+                } else {
+                    isAutoDownloadEnabled = isAutoDownloadEnabled === 'true';
+                }
+                
+                // 绑定下载开关事件
+                const downloadToggle = document.getElementById('auto-download-toggle');
+                const statusDiv = document.getElementById('auto-download-status');
+                
+                if (downloadToggle) {
+                    downloadToggle.checked = isAutoDownloadEnabled;
+                    downloadToggle.addEventListener('change', (e) => {
+                        const isChecked = e.target.checked;
+                        localStorage.setItem('auto_download_enabled', isChecked);
+                        if (isChecked) {
+                            console.log('✅ 自动同步云端数据已开启（每30分钟检查一次）');
+                            if (statusDiv) {
+                                statusDiv.innerHTML = '⏳ 自动同步已开启，每30分钟检查一次云端更新';
+                                statusDiv.style.color = '#28a745';
+                                setTimeout(() => {
+                                    if (statusDiv.innerHTML === '⏳ 自动同步已开启，每30分钟检查一次云端更新') {
+                                        statusDiv.innerHTML = '';
+                                    }
+                                }, 5000);
+                            }
+                            setTimeout(() => performAutoDownload(), 3000);
+                        } else {
+                            console.log('⏸️ 自动同步云端数据已关闭');
+                            if (statusDiv) {
+                                statusDiv.innerHTML = '⏸️ 自动同步已关闭';
+                                statusDiv.style.color = '#ff9f43';
+                                setTimeout(() => {
+                                    if (statusDiv.innerHTML === '⏸️ 自动同步已关闭') {
+                                        statusDiv.innerHTML = '';
+                                    }
+                                }, 3000);
+                            }
+                        }
+                    });
+                }
+                
+                if (!isAutoDownloadEnabled) {
+                    console.log('⏸️ 自动同步云端数据已关闭，跳过启动');
+                    if (statusDiv) statusDiv.innerHTML = '';
+                    return;
+                }
+                
+                // 清除可能存在的旧定时器
+                if (window.autoDownloadInterval) {
+                    clearInterval(window.autoDownloadInterval);
+                }
+                
+                // 每30分钟检查一次云端更新
+                window.autoDownloadInterval = setInterval(async () => {
+                    const isStillEnabled = localStorage.getItem('auto_download_enabled') === 'true';
+                    if (!isStillEnabled) return;
+                    
+                    console.log('🔍 定时检查云端更新...');
+                    await performAutoDownload();
+                }, 30 * 60 * 1000); // 30分钟
+                
+                console.log('✅ 自动下载定时器已启动（每30分钟检查一次）');
+                
+                // 页面加载时也执行一次检查
+                setTimeout(() => {
+                    const isStillEnabled = localStorage.getItem('auto_download_enabled') === 'true';
+                    if (isStillEnabled) {
+                        performAutoDownload();
+                    }
+                }, 5000);
             };
             const setupAutoCleanup = () => {
                 state.cleanupInterval = setInterval(async () => {
