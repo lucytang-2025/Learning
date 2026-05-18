@@ -576,8 +576,8 @@
 <body>
     <div class="container">
         <header>
-            <h1>复习打卡计划 - 增强版</h1>
-            <p class="app-description">日积月累、持之以恒，系列任务可灵活调整间隔</p>
+            <h1>复习打卡计划 - 云同步</h1>
+            <p class="app-description">日积月累、持之以恒</p>
         </header>
 
         <!-- 标签页 -->
@@ -1115,7 +1115,7 @@
         </div>
 
         <footer style="text-align: center; padding: 20px; color: #64748b; font-size: 14px; border-top: 1px solid #e2e8f0;">
-            <p>复习打卡计划 &copy; 2023 - 系列任务智能暂停增强版</p>
+            <p>复习打卡计划 &copy; 2025</p>
         </footer>
     </div>
 
@@ -1211,7 +1211,7 @@
         </div>
     </div>
 
-    <!-- 暂停管理模态框 - 增强版 -->
+    <!-- 暂停管理模态框 - 云同步 -->
     <div id="pause-management-modal" class="modal hidden">
         <div class="modal-content">
             <div class="modal-header">
@@ -1276,7 +1276,7 @@
         </div>
     </div>
 
-    <!-- 取消暂停管理模态框 - 增强版 -->
+    <!-- 取消暂停管理模态框 - 云同步 -->
     <div id="resume-management-modal" class="modal hidden">
         <div class="modal-content">
             <div class="modal-header">
@@ -2867,7 +2867,7 @@ const initApp = async () => {
                     });
                 });
 
-                // 暂停相关 - 使用增强版
+                // 暂停相关 - 使用云同步
                 DOM.selectAllResumeTasks.addEventListener('change', function() {
                     const isChecked = this.checked;
                     document.querySelectorAll('.resume-task-selection-checkbox').forEach(cb => {
@@ -5490,7 +5490,7 @@ task.checkins.push(newCheckin);
                 return true;
             };
 
-            // ==================== 增强版暂停功能 ====================
+            // ==================== 云同步暂停功能 ====================
             const showEnhancedPauseModal = (parentTaskId) => {
                 const parentTask = state.tasks.find(t => t.id === parentTaskId);
                 if (!parentTask || !parentTask.isParentTask) return;
@@ -5604,7 +5604,7 @@ task.checkins.push(newCheckin);
                 alert(`成功暂停了 ${pausedCount} 个子任务至 ${untilDate.toLocaleDateString()}`);
             };
 
-            // ==================== 增强版恢复功能 ====================
+            // ==================== 云同步恢复功能 ====================
             const showEnhancedResumeModal = (parentTaskId) => {
                 const parentTask = state.tasks.find(t => t.id === parentTaskId);
                 if (!parentTask || !parentTask.isParentTask) return;
