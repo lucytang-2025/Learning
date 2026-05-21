@@ -4392,7 +4392,15 @@ const renderNormalTaskItem = (task) => {
             const startRecording = async () => {
                 if (!state.currentTask) { alert('请先选择一个任务！'); return; }
                 try {
-                    const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+                    // 优先使用 MP4 格式（更通用，华为录音机支持更好）
+let mimeType = 'audio/mp4';
+if (!MediaRecorder.isTypeSupported('audio/mp4')) {
+    mimeType = 'audio/mpeg';
+    if (!MediaRecorder.isTypeSupported('audio/mpeg')) {
+        mimeType = 'audio/webm';  // 最后备选
+    }
+}
+console.log('录音格式:', mimeType);
                     
                     const stream = await navigator.mediaDevices.getUserMedia({ 
                         audio: {
@@ -4496,13 +4504,15 @@ const renderNormalTaskItem = (task) => {
                     const date = new Date();
                     const dateStr = `${date.getFullYear()}${(date.getMonth()+1).toString().padStart(2,'0')}${date.getDate().toString().padStart(2,'0')}_${date.getHours().toString().padStart(2,'0')}${date.getMinutes().toString().padStart(2,'0')}${date.getSeconds().toString().padStart(2,'0')}`;
                     
-                    let ext = 'webm';
-                    if (recording.mimeType.includes('mp4') || recording.mimeType.includes('m4a')) {
-                        ext = 'm4a';
-                    } else if (recording.mimeType.includes('wav')) {
-                        ext = 'wav';
-                    }
-                    
+// 优先使用 m4a 扩展名（华为录音机支持）
+let ext = 'm4a';
+if (recording.mimeType.includes('webm')) {
+    ext = 'webm';
+} else if (recording.mimeType.includes('wav')) {
+    ext = 'wav';
+} else if (recording.mimeType.includes('mpeg') || recording.mimeType.includes('mp3')) {
+    ext = 'mp3';
+}                    
                     const fileName = `${taskName}_${dateStr}.${ext}`;
                     
                     const audioBlob = dataURLtoBlob(recording.audioData);
