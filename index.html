@@ -379,6 +379,16 @@
         .modal-body { padding: 20px; }
 
         /* 工具类 */
+        .note-checkbox {
+            cursor: pointer;
+            font-size: 18px;
+            margin-right: 6px;
+            user-select: none;
+            display: inline-block;
+        }
+        .note-checkbox.checked {
+            color: #1dd1a1;
+        }
         .hidden { display: none !important; }
         .text-center { text-align: center; }
         .empty-state {
@@ -549,6 +559,7 @@
             <div class="tab" data-tab="calendar">日历视图</div>
             <div class="tab" data-tab="checkin">打卡</div>
             <div class="tab" data-tab="data">数据管理</div>
+            <div class="tab" data-tab="notes">备注</div>
         </div>
 
         <!-- 今日任务标签页 -->
@@ -1077,7 +1088,88 @@
 </div>
             </div>
         </div>
+        <!-- 备注页 -->
+<div class="tab-content" id="notes-tab">
+    <h2>📝 辅导思路</h2>
 
+    <!-- 学期 + 操作 -->
+    <div style="display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap; align-items:center;">
+        <select id="note-semester" style="width:auto; padding:8px; border-radius:8px;">
+            <option value="">选择学期</option>
+            <option>一上</option><option>一下</option>
+            <option>二上</option><option>二下</option>
+            <option>三上</option><option>三下</option>
+            <option>四上</option><option>四下</option>
+            <option>五上</option><option>五下</option>
+            <option>六上</option><option>六下</option>
+            <option>七上</option><option>七下</option>
+            <option>八上</option><option>八下</option>
+            <option>九上</option><option>九下</option>
+            <option>高一上</option><option>高一下</option>
+            <option>高二上</option><option>高二下</option>
+            <option>高三上</option><option>高三下</option>
+        </select>
+        <button class="btn btn-primary" id="note-new-btn">+ 新建</button>
+        <button class="btn btn-success" id="note-save-btn">💾 保存</button>
+        <span id="note-tip" style="font-size:12px; color:#1dd1a1;"></span>
+    </div>
+
+    <!-- 工具栏（两行） -->
+    <div id="note-toolbar" style="padding:8px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:12px 12px 0 0;">
+        <!-- 第一行：字体、字号、颜色 -->
+        <div style="display:flex; gap:5px; flex-wrap:wrap; margin-bottom:6px; align-items:center;">
+            <select id="note-font" title="字体" style="width:auto; padding:5px; font-size:13px; border-radius:6px;">
+                <option value="system-ui, 'Segoe UI', sans-serif">默认字体</option>
+                <option value="'Microsoft YaHei', sans-serif">微软雅黑</option>
+                <option value="SimSun, serif">宋体</option>
+                <option value="SimHei, sans-serif">黑体</option>
+                <option value="KaiTi, serif">楷体</option>
+                <option value="'Courier New', monospace">等宽</option>
+            </select>
+            <select id="note-size" title="字号" style="width:auto; padding:5px; font-size:13px; border-radius:6px;">
+                <option value="12px">12</option>
+                <option value="14px" selected>14</option>
+                <option value="16px">16</option>
+                <option value="18px">18</option>
+                <option value="20px">20</option>
+                <option value="24px">24</option>
+                <option value="28px">28</option>
+                <option value="32px">32</option>
+            </select>
+            <label style="display:flex; align-items:center; gap:3px; font-size:12px; margin:0;">
+                🎨<input type="color" id="note-color" value="#2c3e50" style="width:30px; height:30px; border:none; cursor:pointer;">
+            </label>
+            <label style="display:flex; align-items:center; gap:3px; font-size:12px; margin:0;">
+                🖍️<input type="color" id="note-bg" value="#ffff00" style="width:30px; height:30px; border:none; cursor:pointer;">
+            </label>
+        </div>
+        <!-- 第二行：格式按钮 -->
+        <div style="display:flex; gap:4px; flex-wrap:wrap; align-items:center;">
+            <button class="btn" data-cmd="bold" title="加粗"><b>B</b></button>
+            <button class="btn" data-cmd="italic" title="倾斜"><i>I</i></button>
+            <button class="btn" data-cmd="underline" title="下划线"><u>U</u></button>
+            <button class="btn" data-cmd="strikeThrough" title="删除线"><s>S</s></button>
+            <button class="btn" data-cmd="insertUnorderedList" title="无序列表">• 列表</button>
+            <button class="btn" data-cmd="insertOrderedList" title="有序编号">1. 编号</button>
+            <button class="btn" data-cmd="justifyLeft" title="左对齐">⬅</button>
+            <button class="btn" data-cmd="justifyCenter" title="居中">⬌</button>
+            <button class="btn" data-cmd="justifyRight" title="右对齐">➡</button>
+            <button class="btn" data-cmd="insertHorizontalRule" title="分割线">—</button>
+            <button class="btn" id="note-checkbox-btn" title="插入复选框">☐ 复选框</button>
+            <button class="btn" data-cmd="removeFormat" title="清除格式">✖ 格式</button>
+        </div>
+    </div>
+
+    <!-- 编辑区 -->
+    <div id="note-editor" contenteditable="true"
+        style="min-height:350px; padding:16px; border:1px solid #e2e8f0; border-top:none; border-radius:0 0 12px 12px; background:white; outline:none; font-size:15px; line-height:1.8;">
+        在这里写辅导思路...
+    </div>
+
+    <!-- 已有备注 -->
+    <h3 style="margin-top:20px;">📚 已有备注</h3>
+    <div id="note-list"></div>
+</div>
         <footer style="text-align: center; padding: 20px; color: #64748b; font-size: 14px; border-top: 1px solid #e2e8f0;">
             <p>复习打卡计划 &copy; 2023 - 系列任务智能暂停增强版</p>
         </footer>
@@ -1517,7 +1609,7 @@
             class DataStorage {
                 constructor() {
                     this.dbName = 'CheckinAppDB';
-                    this.version = 17; // 升级版本号
+                    this.version = 5; // 升级版本号
                     this.db = null;
                 }
 
@@ -1549,6 +1641,9 @@
                             }
                             if (!db.objectStoreNames.contains('settings')) {
                                 db.createObjectStore('settings', { keyPath: 'key' });
+                            }
+                            if (!db.objectStoreNames.contains('notes')) {
+                                db.createObjectStore('notes', { keyPath: 'id' });
                             }
                             if (!db.objectStoreNames.contains('system')) {
                                 db.createObjectStore('system', { keyPath: 'key' });
@@ -4960,7 +5055,6 @@ task.checkins.push(newCheckin);
                     </head><body><img src="${photo.imageData}" alt="打卡照片"></body></html>
                 `);
             };
-
             // ==================== 数据管理 ====================
             const showDataManagementModal = async () => {
                 DOM.dataModal.classList.remove('hidden');
@@ -6665,15 +6759,268 @@ const renderBatchCheckinItem = (item) => {
             window.togglePhotoSelection = togglePhotoSelection;
             window.showEnhancedPauseModal = showEnhancedPauseModal;
             window.showEnhancedResumeModal = showEnhancedResumeModal;
+// ========== 备注页 ==========
+let noteList = [];
+let currentNoteId = null;
+let noteAutoTimer = null;
 
+// 打开 notes 表（复用 DataStorage 的数据库）
+async function getNoteDB() {
+    await dataStorage.open();
+    // 如果数据库里没有 notes 表，说明版本不够，提示用户
+    if (!dataStorage.db.objectStoreNames.contains('notes')) {
+        alert('数据库缺少 notes 表，请刷新页面重试（如果还不行，说明版本号需要升级）');
+    }
+    return dataStorage.db;
+}
+
+// 加载所有备注
+async function loadNotes() {
+    const database = await getNoteDB();
+    const tx = database.transaction('notes', 'readonly');
+    noteList = await new Promise(r => {
+        tx.objectStore('notes').getAll().onsuccess = e => r(e.target.result || []);
+    });
+    renderNoteList();
+}
+
+// 保存当前备注（手动或自动）
+async function saveNote(silent = false) {
+    const editor = document.getElementById('note-editor');
+    if (!editor) return;
+    const content = editor.innerHTML;
+    const semester = document.getElementById('note-semester').value || '未命名学期';
+    const plain = content.replace(/<[^>]+>/g, '').trim();
+    if (plain === '' && !currentNoteId) return;
+
+    const note = {
+        id: currentNoteId || Date.now(),
+        semester: semester,
+        content: content,
+        updated: new Date().toISOString()
+    };
+    if (!currentNoteId) { currentNoteId = note.id; noteList.push(note); }
+    else {
+        const i = noteList.findIndex(n => n.id === currentNoteId);
+        if (i > -1) noteList[i] = note;
+        else noteList.push(note);
+    }
+
+    const database = await getNoteDB();
+    const tx = database.transaction('notes', 'readwrite');
+    tx.objectStore('notes').put(note);
+    await new Promise(r => tx.oncomplete = r);
+
+    if (!silent) {
+        const tip = document.getElementById('note-tip');
+        tip.textContent = '✅ 已保存 ' + new Date().toLocaleTimeString();
+        setTimeout(() => tip.textContent = '', 2000);
+    }
+    renderNoteList();
+}
+
+// 显示备注列表
+function renderNoteList() {
+    const list = document.getElementById('note-list');
+    if (!list) return;
+    list.innerHTML = '';
+    if (noteList.length === 0) {
+        list.innerHTML = '<p style="color:#94a3b8;">还没有备注</p>';
+        return;
+    }
+    noteList.sort((a, b) => new Date(b.updated) - new Date(a.updated));
+    noteList.forEach(n => {
+        const div = document.createElement('div');
+        div.className = 'task-item';
+        div.style.cursor = 'pointer';
+        const preview = (n.content || '').replace(/<[^>]+>/g, '').slice(0, 40);
+        div.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                <div>
+                    <strong>📘 ${n.semester}</strong>
+                    <div style="font-size:12px; color:#64748b;">${preview || '（空）'}</div>
+                    <div style="font-size:11px; color:#94a3b8;">更新: ${new Date(n.updated).toLocaleString()}</div>
+                </div>
+                <div style="display:flex; gap:6px;">
+                    <button class="btn btn-primary" data-open="${n.id}">打开</button>
+                    <button class="btn" data-del="${n.id}" style="background:#ffe3e3;">删除</button>
+                </div>
+            </div>`;
+        list.appendChild(div);
+    });
+
+    list.querySelectorAll('[data-open]').forEach(b => {
+        b.onclick = () => {
+            const note = noteList.find(n => n.id == b.dataset.open);
+            if (!note) return;
+            currentNoteId = note.id;
+            document.getElementById('note-editor').innerHTML = note.content;
+            document.getElementById('note-semester').value = note.semester;
+            bindNoteCheckboxes();
+        };
+    });
+    list.querySelectorAll('[data-del]').forEach(b => {
+        b.onclick = async () => {
+            if (!confirm('确定删除？')) return;
+            const database = await getNoteDB();
+            const tx = database.transaction('notes', 'readwrite');
+            tx.objectStore('notes').delete(Number(b.dataset.del));
+            await new Promise(r => tx.oncomplete = r);
+            if (currentNoteId == b.dataset.del) {
+                currentNoteId = null;
+                document.getElementById('note-editor').innerHTML = '';
+            }
+            await loadNotes();
+        };
+    });
+}
+
+// 插入复选框（点击变打勾）
+function insertCheckbox() {
+    const editor = document.getElementById('note-editor');
+    editor.focus();
+    const html = `<span class="note-checkbox" contenteditable="false">☐</span>&nbsp;`;
+    document.execCommand('insertHTML', false, html);
+    bindNoteCheckboxes();
+    saveNote(true);
+}
+
+// 绑定复选框点击事件
+function bindNoteCheckboxes() {
+    document.querySelectorAll('#note-editor .note-checkbox').forEach(cb => {
+        cb.onclick = (e) => {
+            e.preventDefault();
+            if (cb.classList.contains('checked')) {
+                cb.classList.remove('checked');
+                cb.textContent = '☐';
+            } else {
+                cb.classList.add('checked');
+                cb.textContent = '☑';
+            }
+            saveNote(true);
+        };
+    });
+}
+
+// 初始化备注页
+function initNotes() {
+    const editor = document.getElementById('note-editor');
+    if (!editor) return;
+
+    const fontSel = document.getElementById('note-font');
+    const sizeSel = document.getElementById('note-size');
+    const colorInput = document.getElementById('note-color');
+    const bgInput = document.getElementById('note-bg');
+    const toolbar = document.getElementById('note-toolbar');
+
+    toolbar.querySelectorAll('[data-cmd]').forEach(btn => {
+        btn.onmousedown = (e) => {
+            e.preventDefault();
+            editor.focus();
+            document.execCommand(btn.dataset.cmd, false, null);
+            saveNote(true);
+        };
+    });
+
+    fontSel.onchange = () => {
+        editor.focus();
+        document.execCommand('fontName', false, fontSel.value);
+        saveNote(true);
+    };
+
+    sizeSel.onchange = () => {
+        editor.focus();
+        document.execCommand('fontSize', false, '7');
+        editor.querySelectorAll('font[size="7"]').forEach(font => {
+            const span = document.createElement('span');
+            span.style.fontSize = sizeSel.value;
+            span.innerHTML = font.innerHTML;
+            font.parentNode.replaceChild(span, font);
+        });
+        saveNote(true);
+    };
+
+    colorInput.onchange = () => {
+        const color = colorInput.value;
+        const sel = window.getSelection();
+        if (sel.rangeCount === 0 || sel.isCollapsed) {
+            editor.focus();
+            document.execCommand('foreColor', false, color);
+            saveNote(true);
+            return;
+        }
+        const range = sel.getRangeAt(0);
+        const span = document.createElement('span');
+        span.style.color = color;
+        try {
+            range.surroundContents(span);
+        } catch (e) {
+            editor.focus();
+            document.execCommand('foreColor', false, color);
+        }
+        saveNote(true);
+    };
+
+    bgInput.onchange = () => {
+        const color = bgInput.value;
+        const sel = window.getSelection();
+        if (sel.rangeCount === 0 || sel.isCollapsed) {
+            editor.focus();
+            document.execCommand('hiliteColor', false, color);
+            saveNote(true);
+            return;
+        }
+        const range = sel.getRangeAt(0);
+        const span = document.createElement('span');
+        span.style.backgroundColor = color;
+        try {
+            range.surroundContents(span);
+        } catch (e) {
+            editor.focus();
+            document.execCommand('hiliteColor', false, color);
+        }
+        saveNote(true);
+    };
+
+    document.getElementById('note-checkbox-btn').onclick = insertCheckbox;
+
+    editor.oninput = () => {
+        clearTimeout(noteAutoTimer);
+        noteAutoTimer = setTimeout(() => saveNote(true), 1000);
+        bindNoteCheckboxes();
+    };
+
+    document.getElementById('note-semester').onchange = () => saveNote(true);
+
+    document.getElementById('note-new-btn').onclick = () => {
+        currentNoteId = null;
+        editor.innerHTML = '';
+        editor.focus();
+        document.getElementById('note-semester').value = '';
+    };
+
+    document.getElementById('note-save-btn').onclick = () => saveNote(false);
+document.getElementById('note-save-btn').addEventListener('click', function(){ saveNote(false); });
+
+    loadNotes().then(bindNoteCheckboxes);
+}
+
+
+// ========== 备注页结束 ==========  
             // 启动应用
             document.addEventListener('DOMContentLoaded', () => {
                 initApp().catch(error => {
                     console.error('应用初始化失败:', error);
                     alert('应用初始化失败: ' + error.message);
                 });
+                // ★ 添加这一行：初始化备注页
+                setTimeout(function() {
+                    try { initNotes(); } catch(e) { console.error('备注初始化失败:', e); }
+                }, 500);
             });
+
         })();
-    </script>
+
+</script>
 </body>
 </html>
