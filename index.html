@@ -2343,10 +2343,18 @@
                         return false;
                     }
                     
+                    // ★ 新增：读取备注
+                    await dataStorage.open();
+                    const noteTx = dataStorage.db.transaction('notes', 'readonly');
+                    const notes = await new Promise(r => {
+                        noteTx.objectStore('notes').getAll().onsuccess = e => r(e.target.result || []);
+                    });
+                    
                     const exportData = {
                         version: '3.0',
                         date: new Date().toISOString(),
-                        tasks: tasks
+                        tasks: tasks,
+                        notes: notes
                     };
                     const content = JSON.stringify(exportData, null, 2);
                     
@@ -2496,6 +2504,18 @@
                             
                             await dataStorage.clearAllData();
                             await dataStorage.saveAllTasks(cloudData.tasks);
+                            
+                            // ★ 新增：恢复备注数据
+                            if (cloudData.notes && Array.isArray(cloudData.notes)) {
+                                await dataStorage.open();
+                                const noteTx = dataStorage.db.transaction('notes', 'readwrite');
+                                const noteStore = noteTx.objectStore('notes');
+                                for (const note of cloudData.notes) {
+                                    noteStore.put(note);
+                                }
+                                await new Promise(r => noteTx.oncomplete = r);
+                            }
+                            
                             await loadLocalData();
                             restoreRecordingUrls();
                             renderTodayTasks();
@@ -2503,6 +2523,11 @@
                             renderCalendar();
                             renderRecordings();
                             renderDataStats();
+                            
+                            // ★ 新增：刷新备注页
+                            if (typeof loadNotes === 'function') {
+                                try { await loadNotes(); } catch(e) { console.error('刷新备注失败:', e); }
+                            }
                             
                             localStorage.setItem('last_sync_time', new Date().toISOString());
                             
@@ -5135,10 +5160,18 @@ task.checkins.push(newCheckin);
                     const photos = await dataStorage.getAllPhotos();
                     const feedbacks = await dataStorage.getAllFromStore('feedbacks');
                     
+                    // ★ 新增：读取备注
+                    await dataStorage.open();
+                    const noteTx = dataStorage.db.transaction('notes', 'readonly');
+                    const notes = await new Promise(r => {
+                        noteTx.objectStore('notes').getAll().onsuccess = e => r(e.target.result || []);
+                    });
+                    
                     const exportData = {
                         version: '3.0',
                         exportDate: new Date().toISOString(),
-                        tasks, recordings, photos, feedbacks
+                        tasks, recordings, photos, feedbacks,
+                        notes
                     };
                     
                     const dataStr = JSON.stringify(exportData, null, 2);
@@ -6428,10 +6461,17 @@ const renderBatchCheckinItem = (item) => {
             const uploadToGist = async (token, gistId) => {
                 try {
                     const tasks = await dataStorage.getAllTasks();
+                    // ★ 新增：读取备注数据
+                    await dataStorage.open();
+                    const noteTx = dataStorage.db.transaction('notes', 'readonly');
+                    const notes = await new Promise(r => {
+                        noteTx.objectStore('notes').getAll().onsuccess = e => r(e.target.result || []);
+                    });
                     const exportData = {
                         version: '3.0',
                         date: new Date().toISOString(),
-                        tasks: tasks
+                        tasks: tasks,
+                        notes: notes   // ★ 新增：把备注也带上
                     };
                     const content = JSON.stringify(exportData, null, 2);
                     
@@ -6522,6 +6562,18 @@ const renderBatchCheckinItem = (item) => {
                         
                         await dataStorage.clearAllData();
                         await dataStorage.saveAllTasks(cloudData.tasks);
+                        
+                        // ★ 新增：恢复备注数据
+                        if (cloudData.notes && Array.isArray(cloudData.notes)) {
+                            await dataStorage.open();
+                            const noteTx = dataStorage.db.transaction('notes', 'readwrite');
+                            const noteStore = noteTx.objectStore('notes');
+                            for (const note of cloudData.notes) {
+                                noteStore.put(note);
+                            }
+                            await new Promise(r => noteTx.oncomplete = r);
+                        }
+                        
                         await loadLocalData();
                         restoreRecordingUrls();
                         renderTodayTasks();
@@ -6529,6 +6581,11 @@ const renderBatchCheckinItem = (item) => {
                         renderCalendar();
                         renderRecordings();
                         renderDataStats();
+                        
+                        // ★ 新增：刷新备注页（如果加载了备注函数）
+                        if (typeof loadNotes === 'function') {
+                            try { await loadNotes(); } catch(e) { console.error('刷新备注失败:', e); }
+                        }
                         
                         alert('✅ 下载成功！数据已恢复');
                         return true;
@@ -6687,10 +6744,17 @@ const renderBatchCheckinItem = (item) => {
                         return false;
                     }
                     
+                    // ★ 新增：读取备注
+                    await dataStorage.open();
+                    const noteTx = dataStorage.db.transaction('notes', 'readonly');
+                    const notes = await new Promise(r => {
+                        noteTx.objectStore('notes').getAll().onsuccess = e => r(e.target.result || []);
+                    });
                     const exportData = {
                         version: '3.0',
                         date: new Date().toISOString(),
-                        tasks: tasks
+                        tasks: tasks,
+                        notes: notes   // ★ 新增
                     };
                     const content = JSON.stringify(exportData, null, 2);
                     
