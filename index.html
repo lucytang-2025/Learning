@@ -2337,11 +2337,15 @@
                 }
                 
                 try {
+                    // ★ 上传前先强制保存备注
+                    try { await saveNote(true); } catch(e) { console.warn('保存备注失败', e); }
                     const tasks = state.tasks;
                     if (!tasks || tasks.length === 0) {
                         console.log('没有任务数据，跳过自动上传');
                         return false;
                     }
+                    
+                    // ★ 新增：读取备注
                     
                     // ★ 新增：读取备注
                     await dataStorage.open();
@@ -2524,9 +2528,14 @@
                             renderRecordings();
                             renderDataStats();
                             
-                            // ★ 新增：刷新备注页
+                            // ★ 刷新备注页，并清空编辑器状态
                             if (typeof loadNotes === 'function') {
-                                try { await loadNotes(); } catch(e) { console.error('刷新备注失败:', e); }
+                                try {
+                                    currentNoteId = null;
+                                    const editor = document.getElementById('note-editor');
+                                    if (editor) editor.innerHTML = '';
+                                    await loadNotes();
+                                } catch(e) { console.error('刷新备注失败:', e); }
                             }
                             
                             localStorage.setItem('last_sync_time', new Date().toISOString());
@@ -6458,8 +6467,10 @@ const renderBatchCheckinItem = (item) => {
             };
             
             // 上传数据到 Gist
-            const uploadToGist = async (token, gistId) => {
+const uploadToGist = async (token, gistId) => {
                 try {
+                    // ★ 上传前先强制保存备注编辑器内容
+                    try { await saveNote(true); } catch(e) { console.warn('保存备注失败', e); }
                     const tasks = await dataStorage.getAllTasks();
                     // ★ 新增：读取备注数据
                     await dataStorage.open();
@@ -6582,9 +6593,14 @@ const renderBatchCheckinItem = (item) => {
                         renderRecordings();
                         renderDataStats();
                         
-                        // ★ 新增：刷新备注页（如果加载了备注函数）
+                        // ★ 刷新备注页，并清空编辑器状态
                         if (typeof loadNotes === 'function') {
-                            try { await loadNotes(); } catch(e) { console.error('刷新备注失败:', e); }
+                            try {
+                                currentNoteId = null;
+                                const editor = document.getElementById('note-editor');
+                                if (editor) editor.innerHTML = '';
+                                await loadNotes();
+                            } catch(e) { console.error('刷新备注失败:', e); }
                         }
                         
                         alert('✅ 下载成功！数据已恢复');
@@ -6738,7 +6754,9 @@ const renderBatchCheckinItem = (item) => {
                 }
                 
                 try {
-                    const tasks = state.tasks;
+                    // ★ 上传前先强制保存备注
+                    try { await saveNote(true); } catch(e) { console.warn('保存备注失败', e); }
+                    const tasks = await dataStorage.getAllTasks();
                     if (!tasks || tasks.length === 0) {
                         alert('没有任务数据可以备份');
                         return false;
@@ -6772,8 +6790,8 @@ const renderBatchCheckinItem = (item) => {
                     });
                     
                     if (response.ok) {
-                        const today = new Date().toDateString();
-                        localStorage.setItem('last_auto_upload_date', today);
+                        // ★ 手动备份不写 last_auto_upload_date，避免影响当天自动上传
+                        localStorage.setItem('last_manual_upload_time', new Date().toISOString());
                         updateLastUploadTimeDisplay();
                         alert('✅ 手动备份成功！数据已保存到云端');
                         console.log('手动备份成功');
@@ -6823,6 +6841,8 @@ const renderBatchCheckinItem = (item) => {
             window.togglePhotoSelection = togglePhotoSelection;
             window.showEnhancedPauseModal = showEnhancedPauseModal;
             window.showEnhancedResumeModal = showEnhancedResumeModal;
+            window.debugNotes = async () => { await loadNotes(); return noteList; };
+
 // ========== 备注页 ==========
 let noteList = [];
 let currentNoteId = null;
@@ -6855,6 +6875,7 @@ async function saveNote(silent = false) {
     const content = editor.innerHTML;
     const semester = document.getElementById('note-semester').value || '未命名学期';
     const plain = content.replace(/<[^>]+>/g, '').trim();
+    // 空内容且没有正在编辑的备注，不保存
     if (plain === '' && !currentNoteId) return;
 
     const note = {
